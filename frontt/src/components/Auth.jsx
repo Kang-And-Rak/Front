@@ -118,7 +118,7 @@ const Auth = ({ setIsLoggedIn, newAccount = false }) => {
         nickname: '',
         email: '',
         password: '',
-        
+        status: '',
         birthDate: ''
     });
     const [error, setError] = useState('');

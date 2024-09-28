@@ -102,74 +102,117 @@
 // };
 
 // export default Board;
-
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getToken, isTokenExpired, refreshToken, removeToken } from '../utils/authUtils';
 import BoardEdit from './BoardEdit';
 import BoardList from './BoardList';
 import BoardWrite from './BoardWrite';
 
 const Board = () => {
-  const [diaries, setDiaries] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [isWriting, setIsWriting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingDiary, setEditingDiary] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDiaries();
-  }, []);
+    const interceptor = axios.interceptors.request.use(async (config) => {
+      const token = getToken();
+      if (token && isTokenExpired(token)) {
+        try {
+          const newToken = await refreshToken();
+          config.headers.Authorization = `Bearer ${newToken}`;
+        } catch (error) {
+          removeToken();
+          navigate('/login');
+          return Promise.reject(error);
+        }
+      } else if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    }, (error) => {
+      return Promise.reject(error);
+    });
 
-  const fetchDiaries = async () => {
+    fetchPosts();
+    fetchCurrentUser();
+
+    return () => {
+      axios.interceptors.request.eject(interceptor);
+    };
+  }, [navigate]);
+
+  const fetchPosts = async () => {
     try {
-      const response = await axios.get('http://your-backend-url/api/diaries', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setDiaries(response.data);
+      const response = await axios.get('http://localhost:3010/api/board');
+      setPosts(response.data);
     } catch (error) {
-      console.error('일기 목록을 불러오는데 실패했습니다:', error);
+      console.error('게시글 목록을 불러오는데 실패했습니다:', error);
+      if (error.response && error.response.status === 401) {
+        navigate('/login');
+      }
+    }
+  };
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await axios.get('http://localhost:3010/api/user');
+      setCurrentUser(response.data);
+    } catch (error) {
+      console.error('사용자 정보를 불러오는데 실패했습니다:', error);
+      if (error.response && error.response.status === 401) {
+        navigate('/login');
+      }
     }
   };
 
   const handleSubmit = async (title, content) => {
     try {
-      await axios.post('http://your-backend-url/api/diaries', { title, content }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      await axios.post('http://localhost:3010/api/board', { title, content });
       setIsWriting(false);
-      fetchDiaries();
+      fetchPosts();
     } catch (error) {
-      console.error('일기 작성에 실패했습니다:', error);
+      console.error('게시글 작성에 실패했습니다:', error);
+      if (error.response && error.response.status === 401) {
+        navigate('/login');
+      }
     }
   };
 
   const handleEdit = async (id, title, content) => {
     try {
-      await axios.put(`http://your-backend-url/api/diaries/${id}`, { title, content }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      await axios.put(`http://localhost:3010/api/board/${id}`, { title, content });
       setIsEditing(false);
-      setEditingDiary(null);
-      fetchDiaries();
+      setEditingPost(null);
+      fetchPosts();
     } catch (error) {
-      console.error('일기 수정에 실패했습니다:', error);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("정말로 이 일기를 삭제하시겠습니까?")) {
-      try {
-        await axios.delete(`http://localhost:3010/api/diaries/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        fetchDiaries();
-      } catch (error) {
-        console.error('일기 삭제에 실패했습니다:', error);
+      console.error('게시글 수정에 실패했습니다:', error);
+      if (error.response && error.response.status === 401) {
+        navigate('/login');
       }
     }
   };
 
-  const startEditing = (diary) => {
-    setEditingDiary(diary);
+  const handleDelete = async (id) => {
+    if (window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
+      try {
+        await axios.delete(`http://localhost:3010/api/board/${id}`);
+        fetchPosts();
+      } catch (error) {
+        console.error('게시글 삭제에 실패했습니다:', error);
+        if (error.response && error.response.status === 401) {
+          navigate('/login');
+        }
+      }
+    }
+  };
+
+  const startEditing = (post) => {
+    setEditingPost(post);
     setIsEditing(true);
   };
 
@@ -182,16 +225,17 @@ const Board = () => {
         />
       ) : isEditing ? (
         <BoardEdit 
-          diary={editingDiary}
+          post={editingPost}
           onSubmit={handleEdit}
           onCancel={() => {
             setIsEditing(false);
-            setEditingDiary(null);
+            setEditingPost(null);
           }}
         />
       ) : (
         <BoardList 
-          diaries={diaries}
+          posts={posts}
+          currentUser={currentUser}
           onWriteClick={() => setIsWriting(true)}
           onEditClick={startEditing}
           onDeleteClick={handleDelete}

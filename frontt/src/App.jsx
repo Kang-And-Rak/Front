@@ -80,7 +80,6 @@
 // }
 
 // export default App;
-
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
@@ -90,6 +89,7 @@ import Calendar from './components/calendar/Calendar';
 import Nav from './components/Nav';
 import Todolist from './components/Todolist';
 import './index.css';
+import { getToken, isTokenExpired, refreshToken, removeToken } from './utils/authUtils';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -97,24 +97,36 @@ function App() {
   const [init, setInit] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.get('http://localhost:3010/api/user', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(response => {
-        setIsLoggedIn(true);
-        setUserObj(response.data);
-      })
-      .catch(() => {
-        localStorage.removeItem('token');
-      })
-      .finally(() => {
-        setInit(true);
-      });
-    } else {
+    const initializeAuth = async () => {
+      const token = getToken();
+      if (token) {
+        if (isTokenExpired(token)) {
+          try {
+            await refreshToken();
+          } catch (error) {
+            removeToken();
+            setIsLoggedIn(false);
+            setUserObj(null);
+            setInit(true);
+            return;
+          }
+        }
+        try {
+          const response = await axios.get('http://localhost:3010/api/user', {
+            headers: { Authorization: `Bearer ${getToken()}` }
+          });
+          setIsLoggedIn(true);
+          setUserObj(response.data);
+        } catch (error) {
+          removeToken();
+          setIsLoggedIn(false);
+          setUserObj(null);
+        }
+      }
       setInit(true);
-    }
+    };
+
+    initializeAuth();
   }, []);
 
   const ProtectedRoute = ({ children }) => {
@@ -142,7 +154,7 @@ function App() {
             } />
             <Route path="/" element={
               <ProtectedRoute>
-                <Todolist userObj={userObj} />
+                <Board userObj={userObj} />
               </ProtectedRoute>
             } />
             <Route path="/todolist" element={
