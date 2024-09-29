@@ -1,8 +1,7 @@
-
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getToken, isTokenExpired, refreshToken, removeToken } from '../../utils/authUtils';
+import { decodeAccessToken, getAccessToken, isAccessTokenExpired, removeAccessToken } from '../../utils/authUtils';
 import BoardEdit from './BoardEdit';
 import BoardList from './BoardList';
 import BoardWrite from './BoardWrite';
@@ -15,37 +14,14 @@ const Board = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const interceptor = axios.interceptors.request.use(async (config) => {
-      const token = getToken();
-      if (token && isTokenExpired(token)) {
-        try {
-          const newToken = await refreshToken();
-          config.headers.Authorization = `Bearer ${newToken}`;
-        } catch (error) {
-          removeToken();
-          navigate('/login');
-          return Promise.reject(error);
-        }
-      } else if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    }, (error) => {
-      return Promise.reject(error);
-    });
-
-    fetchPosts();
-    fetchCurrentUser();
-
-    return () => {
-      axios.interceptors.request.eject(interceptor);
-    };
-  }, [navigate]);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:3010/api/board');
+      const accessToken = getAccessToken();
+      const response = await axios.get('http://localhost:3010/post', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
       setPosts(response.data);
     } catch (error) {
       console.error('게시글 목록을 불러오는데 실패했습니다:', error);
@@ -53,23 +29,50 @@ const Board = () => {
         navigate('/login');
       }
     }
-  };
+  }, [navigate]);
 
-  const fetchCurrentUser = async () => {
-    try {
-      const response = await axios.get('http://localhost:3010/api/user');
-      setCurrentUser(response.data);
-    } catch (error) {
-      console.error('사용자 정보를 불러오는데 실패했습니다:', error);
-      if (error.response && error.response.status === 401) {
-        navigate('/login');
-      }
+  useEffect(() => {
+    const accessToken = getAccessToken();
+    if (accessToken && !isAccessTokenExpired(accessToken)) {
+      const decodedToken = decodeAccessToken(accessToken);
+      setCurrentUser(decodedToken);
+    } else {
+      navigate('/login');
     }
-  };
+
+    const interceptor = axios.interceptors.request.use((config) => {
+      const accessToken = getAccessToken();
+      if (accessToken) {
+        if (isAccessTokenExpired(accessToken)) {
+          removeAccessToken();
+          navigate('/login');
+          return Promise.reject('Access token expired');
+        }
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+      return config;
+    }, (error) => {
+      return Promise.reject(error);
+    });
+
+    fetchPosts();
+
+    return () => {
+      axios.interceptors.request.eject(interceptor);
+    };
+  }, [navigate, fetchPosts]);
 
   const handleSubmit = async (title, content) => {
     try {
-      await axios.post('http://localhost:3010/api/board', { title, content });
+      const accessToken = getAccessToken();
+      await axios.post('http://localhost:3010/post', 
+        { title, content },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      );
       setIsWriting(false);
       fetchPosts();
     } catch (error) {
@@ -82,7 +85,15 @@ const Board = () => {
 
   const handleEdit = async (id, title, content) => {
     try {
-      await axios.put(`http://localhost:3010/api/board/${id}`, { title, content });
+      const accessToken = getAccessToken();
+      await axios.put(`http://localhost:3010/post/${id}`, 
+        { title, content },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      );
       setIsEditing(false);
       setEditingPost(null);
       fetchPosts();
@@ -97,7 +108,12 @@ const Board = () => {
   const handleDelete = async (id) => {
     if (window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
       try {
-        await axios.delete(`http://localhost:3010/api/board/${id}`);
+        const accessToken = getAccessToken();
+        await axios.delete(`http://localhost:3010/post/${id}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
         fetchPosts();
       } catch (error) {
         console.error('게시글 삭제에 실패했습니다:', error);

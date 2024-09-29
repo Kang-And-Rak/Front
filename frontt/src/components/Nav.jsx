@@ -35,12 +35,12 @@ const Nav = ({ isLoggedIn, setIsLoggedIn }) => {
           <Link to="/" className="text-white text-3xl font-bold font-permanent-marker">
             RAK
           </Link>
-          <Link to="/todolist" className="text-white text-xl font-bold">
+          {/* <Link to="/todolist" className="text-white text-xl font-bold">
             투두리스트
           </Link>
           <Link to="/calendar" className="text-white text-xl font-bold">
             캘린더
-          </Link>
+          </Link> */}
           <Link to="/" className="text-white text-xl font-bold">
             게시판
           </Link>

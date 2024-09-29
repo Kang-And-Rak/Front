@@ -1,14 +1,11 @@
-
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import Auth from './components/Auth';
 import Board from './components/board/Board';
-import Calendar from './components/calendar/Calendar';
 import Nav from './components/Nav';
-import Todolist from './components/Todolist';
 import './index.css';
-import { getToken, isTokenExpired, refreshToken, removeToken } from './utils/authUtils';
+import { getToken, isTokenExpired, removeToken } from './utils/authUtils';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,19 +17,15 @@ function App() {
       const token = getToken();
       if (token) {
         if (isTokenExpired(token)) {
-          try {
-            await refreshToken();
-          } catch (error) {
-            removeToken();
-            setIsLoggedIn(false);
-            setUserObj(null);
-            setInit(true);
-            return;
-          }
+          removeToken();
+          setIsLoggedIn(false);
+          setUserObj(null);
+          setInit(true);
+          return;
         }
         try {
           const response = await axios.get('http://localhost:3010/api/user', {
-            headers: { Authorization: `Bearer ${getToken()}` }
+            headers: { Authorization: `Bearer ${token}` }
           });
           setIsLoggedIn(true);
           setUserObj(response.data);
@@ -76,7 +69,7 @@ function App() {
                 <Board userObj={userObj} />
               </ProtectedRoute>
             } />
-            <Route path="/todolist" element={
+            {/* <Route path="/todolist" element={
               <ProtectedRoute>
                 <Todolist userObj={userObj} />
               </ProtectedRoute>
@@ -85,7 +78,7 @@ function App() {
               <ProtectedRoute>
                 <Calendar userObj={userObj} />
               </ProtectedRoute>
-            } />
+            } /> */}
             <Route path="/board" element={
               <ProtectedRoute>
                 <Board userObj={userObj} />
