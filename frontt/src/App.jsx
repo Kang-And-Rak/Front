@@ -92,16 +92,15 @@
 // }
 
 // export default App;
-
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import Auth from './components/Auth';
 import Board from './components/board/Board';
-import BoardDetail from './components/board/BoardDetail'; // 새로 추가
+import BoardDetail from './components/board/BoardDetail';
 import Nav from './components/Nav';
 import './index.css';
-import { getToken, isTokenExpired, removeToken } from './utils/authUtils';
+import { getAccessToken, isAccessTokenExpired, removeAccessToken } from './utils/authUtils';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -110,10 +109,10 @@ function App() {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = getToken();
+      const token = getAccessToken();
       if (token) {
-        if (isTokenExpired(token)) {
-          removeToken();
+        if (isAccessTokenExpired(token)) {
+          removeAccessToken();
           setIsLoggedIn(false);
           setUserObj(null);
           setInit(true);
@@ -126,7 +125,7 @@ function App() {
           setIsLoggedIn(true);
           setUserObj(response.data);
         } catch (error) {
-          removeToken();
+          removeAccessToken();
           setIsLoggedIn(false);
           setUserObj(null);
         }

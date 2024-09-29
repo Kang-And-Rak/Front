@@ -115,11 +115,10 @@
 // };
 
 // export default BoardDetail;
-
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getToken } from '../../utils/authUtils';
+import { getAccessToken } from '../../utils/authUtils';
 
 const BoardDetail = ({ userObj }) => {
   const [post, setPost] = useState(null);
@@ -129,14 +128,9 @@ const BoardDetail = ({ userObj }) => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchPost();
-    fetchComments();
-  }, [id]);
-
-  const fetchPost = async () => {
+  const fetchPost = useCallback(async () => {
     try {
-      const token = getToken();
+      const token = getAccessToken();
       const response = await axios.get(`http://localhost:3010/post/${id}`, {
         headers: { Authorization: `accessToken ${token}` }
       });
@@ -148,11 +142,11 @@ const BoardDetail = ({ userObj }) => {
         navigate('/login');
       }
     }
-  };
+  }, [id, navigate]);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
-      const token = getToken();
+      const token = getAccessToken();
       const response = await axios.get(`http://localhost:3010/post/${id}/comment`, {
         headers: { Authorization: `accessToken ${token}` }
       });
@@ -160,11 +154,16 @@ const BoardDetail = ({ userObj }) => {
     } catch (error) {
       console.error('댓글을 불러오는데 실패했습니다:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchPost();
+    fetchComments();
+  }, [fetchPost, fetchComments]);
 
   const handleLike = async () => {
     try {
-      const token = getToken();
+      const token = getAccessToken();
       if (isLiked) {
         await axios.delete(`http://localhost:3010/post/${id}/like`, {
           headers: { Authorization: `accessToken ${token}` }
@@ -175,7 +174,7 @@ const BoardDetail = ({ userObj }) => {
         });
       }
       setIsLiked(!isLiked);
-      fetchPost(); // 좋아요 수 업데이트를 위해 게시글 다시 불러오기
+      fetchPost();
     } catch (error) {
       console.error('좋아요 처리에 실패했습니다:', error);
     }
@@ -184,7 +183,7 @@ const BoardDetail = ({ userObj }) => {
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = getToken();
+      const token = getAccessToken();
       await axios.post(`http://localhost:3010/post/${id}/comment`, {
         content: newComment
       }, {
